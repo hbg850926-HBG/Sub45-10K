@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Sub45-12.5K">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta charset="UTF-8">
+    <title>奔向Sub45-10K 備賽與紀錄系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        nordicBg: '#F9F9F7',       // 經典北歐燕麥暖白
+                        nordicSage: {
+                            50: '#F4F7F5',   // 極淡苔綠
+                            100: '#E6EDE9',  // 淡苔綠
+                            200: '#CDDDD4',  // 溫潤苔綠
+                            500: '#748E81',  // 迷霧苔綠
+                        },
+                        nordicIce: {
+                            50: '#F3F6F8',   // 極淡冰川藍
+                            100: '#E3EBF0',  // 冰川藍 100
+                            200: '#C7D8E2',  // 冰川藍 200
+                            500: '#547C8F',  // 黛藍
+                            600: '#436373',
+                        },
+                        nordicGray: {
+                            50: '#FAF9F9',   // 粉灰 50
+                            100: '#F1EDE9',  // 暖樺木沙色
+                            200: '#E5E0DA',  // 樺木灰 200
+                            300: '#D2C9C0',  // 樺木灰 300
+                            800: '#2A2B2A',  // 墨石炭黑
+                        },
+                        accent: { orange: '#D47E59' } // 暖黏土橘
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #F9F9F7; color: #000000; font-family: system-ui, -apple-system, sans-serif; }
+        .chart-container { position: relative; width: 100%; height: 260px; margin-left: auto; margin-right: auto; }
+        .tab-content { display: none; animation: fadeIn 0.35s ease-in-out; }
+        .tab-content.active { display: block; }
+        .nav-tab { border-bottom: 2px solid transparent; transition: all 0.2s ease; }
+        .nav-tab.active { border-bottom: 2px solid #547C8F; color: #547C8F; font-weight: bold; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .table-scroll::-webkit-scrollbar { height: 4px; }
+        .table-scroll::-webkit-scrollbar-thumb { background: #CDDDD4; border-radius: 10px; }
+        .nordic-gradient { background: linear-gradient(135deg, #E6EDE9 0%, #E3EBF0 100%); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col text-sm text-black">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <!-- Custom Modal Container -->
+    <div id="custom-modal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl border border-nordicGray-200 transform scale-95 transition-transform duration-200">
+            <h3 id="modal-title" class="text-base font-bold text-black mb-2">確認提示</h3>
+            <p id="modal-text" class="text-xs text-nordicGray-800 mb-6">您確定要執行此操作嗎？</p>
+            <div class="flex justify-end gap-3">
+                <button id="modal-cancel-btn" class="px-4 py-2 bg-nordicGray-100 hover:bg-nordicGray-200 rounded-lg text-xs font-bold text-black">取消</button>
+                <button id="modal-confirm-btn" class="px-4 py-2 bg-nordicIce-500 hover:bg-nordicIce-600 rounded-lg text-xs font-bold text-white">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="bg-white border-b border-nordicSage-100 sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <!-- Cool Female Runner Silhouette SVG (With Ponytail, Modern Nordic Slate Blue Design, Skin-Neutral) -->
+                <div class="w-10 h-10 rounded-full bg-nordicIce-100 flex items-center justify-center flex-shrink-0">
+                    <svg class="w-7 h-7 text-nordicIce-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <!-- Head with high ponytail -->
+                        <circle cx="12" cy="4" r="2" fill="currentColor" />
+                        <path d="M14 3c1.2-1 3 0 3.5 1.2M10.5 4H8" stroke-width="1.2" />
+                        <!-- Torso/Active dynamic movement lines -->
+                        <path d="M12 6c-0.8 1.8-2 2.5-1.5 4.8l0.8 4" />
+                        <path d="M12 6l3 2 1.2-1.2" />
+                        <!-- Arms in running motion -->
+                        <path d="M10 7.5L7.5 9l-2-1" />
+                        <!-- Legs in running extension -->
+                        <path d="M11 15L8 18.5l1.2 1.2" />
+                        <path d="M12.5 13.5l3 3h2.5" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black text-black tracking-tight flex items-center gap-2">
+                        奔向Sub45-10K 備賽與紀錄系統
+                    </h1>
+                    <p class="text-xs text-black/70 mt-1">
+                        🎯 目標賽事：9/6 Panasonic Run 12.5K ｜ 一週高效 3 跑 ｜ 在北歐極簡美學中追求極致速度
+                    </p>
+                </div>
+            </div>
+            <nav class="flex gap-4 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+                <button class="nav-tab active px-2 py-1.5 text-xs uppercase tracking-wider whitespace-nowrap text-black font-semibold" onclick="switchTab('tab-strategy', this)">戰略與配速</button>
+                <button class="nav-tab px-2 py-1.5 text-xs uppercase tracking-wider whitespace-nowrap text-black font-semibold" onclick="switchTab('tab-plan', this)">週期課表</button>
+                <button class="nav-tab px-2 py-1.5 text-xs uppercase tracking-wider whitespace-nowrap text-black font-semibold" onclick="switchTab('tab-strength', this)">跑者重訓</button>
+                <button class="nav-tab px-2 py-1.5 text-xs uppercase tracking-wider whitespace-nowrap text-black font-semibold" onclick="switchTab('tab-track', this)">訓練追蹤</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hot-blooded Inspiring Banner (Slogan 1) -->
+    <div class="w-full bg-gradient-to-r from-nordicSage-100 to-nordicIce-100 border-b border-nordicSage-200">
+        <div class="max-w-6xl mx-auto px-6 py-2.5 flex justify-between items-center text-xs text-black font-medium">
+            <span class="flex items-center gap-1.5 italic font-bold">
+                <span class="text-sm">🔥</span> 「頂尖的速度沒有奇蹟，只有不斷戰勝酸痛與重力的頑強意志！」
+            </span>
+            <span class="hidden md:inline text-nordicIce-500 font-extrabold tracking-widest font-mono">DETERMINATION // SUB-45</span>
+        </div>
+    </div>
+
+    <main class="max-w-6xl mx-auto w-full flex-grow p-6">
+
+        <!-- SECTION 1: Strategy & VDOT & TSB -->
+        <section id="tab-strategy" class="tab-content active">
+            
+            <!-- Quick Profile Bar -->
+            <div class="bg-white p-5 rounded-xl border border-nordicGray-200 mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-black shadow-xs">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl text-nordicIce-500">⚡</span>
+                    <div>
+                        <h4 class="font-bold text-sm">個人最佳戰績 (PB)</h4>
+                        <p class="text-xs text-black/75 mt-0.5">1/25 10K: <span class="text-nordicIce-500 font-bold font-mono">Sub-48 (47分台)</span> ｜ 4/26 半馬: <span class="text-nordicIce-500 font-bold font-mono">Sub-111 (1小時50分台)</span></p>
+                    </div>
+                </div>
+                <div class="h-px w-full md:h-10 md:w-px bg-nordicGray-200"></div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl text-accent-orange">🎯</span>
+                    <div>
+                        <h4 class="font-bold text-accent-orange text-sm">9/6 賽事目標 (12.5K)</h4>
+                        <p class="text-xs text-black/75 mt-0.5">Panasonic Run 12.5K 預估配速 <span class="text-accent-orange font-black font-mono">4'38" - 4'40" /km</span> (目標約 58:20 完賽)</p>
+                    </div>
+                </div>
+                <div class="h-px w-full md:h-10 md:w-px bg-nordicGray-200"></div>
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl text-nordicSage-500 font-bold">🏟️</span>
+                    <div>
+                        <h4 class="font-bold text-sm">高效能跑步模式</h4>
+                        <p class="text-xs text-black/75 mt-0.5"><span class="text-nordicSage-500 font-bold">一週精實 3 跑</span> ｜ 10K 終極配速目標 4'30"/km (Sub-45)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                
+                <!-- Left: VDOT 44.2 table and interval pacing card -->
+                <div class="space-y-4">
+                    <div class="bg-white p-5 rounded-xl border border-nordicGray-200">
+                        <div class="flex justify-between items-center border-b border-nordicGray-200 pb-2 mb-3">
+                            <h3 class="font-extrabold text-black text-sm flex items-center"><span class="mr-2 text-base">📈</span> VDOT 44.2 專項配速系統</h3>
+                            <span class="bg-nordicIce-500 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-md">10K Sub-45 基準</span>
+                        </div>
+                        
+                        <div class="overflow-hidden rounded-lg border border-nordicGray-200 mb-4">
+                            <table class="w-full text-xs">
+                                <thead class="bg-nordicSage-100 text-black font-bold border-b border-nordicSage-200">
+                                    <tr>
+                                        <th class="p-2 text-left">強度等級</th>
+                                        <th class="p-2 text-left">訓練目的</th>
+                                        <th class="p-2 text-left">目標配速 (10K Sub-45)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-nordicGray-100 font-mono text-black">
+                                    <tr class="hover:bg-nordicSage-50/50"><td class="p-2 font-bold text-nordicGray-300">E</td><td class="p-2 font-sans">輕鬆跑 (有氧耐力/主動恢復)</td><td class="p-2">5'32" - 6'15" /km</td></tr>
+                                    <tr class="hover:bg-nordicSage-50/50"><td class="p-2 font-bold">M</td><td class="p-2 font-sans">馬拉松配速 (心肺適應)</td><td class="p-2">4'56" /km</td></tr>
+                                    <tr class="hover:bg-nordicSage-50/50 bg-nordicSage-50/50"><td class="p-2 font-bold text-nordicSage-500">T</td><td class="p-2 font-sans">乳酸門檻跑 (提高排乳酸效率)</td><td class="p-2 text-nordicSage-500 font-bold">4'39" /km</td></tr>
+                                    <tr class="hover:bg-nordicSage-50/50 bg-nordicIce-50"><td class="p-2 font-bold text-nordicIce-500">I</td><td class="p-2 font-sans">最大攝氧跑 (高氧債承受)</td><td class="p-2 text-nordicIce-500 font-bold">4'16" /km</td></tr>
+                                    <tr class="hover:bg-nordicSage-50/50"><td class="p-2 font-bold">R</td><td class="p-2 font-sans">反覆跑 (神經募集/跑步經濟性)</td><td class="p-2">3'58" /km</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Interval Pacing/Time Card (Optimized compact layout) -->
+                        <div class="bg-nordicIce-50 p-4 rounded-xl border border-nordicIce-200">
+                            <h4 class="font-extrabold text-black text-xs mb-3 border-b border-nordicIce-200 pb-1.5 flex justify-between items-center">
+                                <span>⏱️ 400m 標準跑道精準配時換算</span>
+                                <span class="text-[10px] text-nordicIce-500 font-normal">體育場定速參考</span>
+                            </h4>
+                            <div class="space-y-1.5 font-mono text-[11px] leading-tight text-black">
+                                <div class="flex justify-between items-center px-2 py-1.5 bg-white rounded border border-nordicSage-100">
+                                    <span class="font-sans font-bold">1000m 間歇 (I)</span>
+                                    <span>配速 4'16"/km ｜ 2.5 圈用時: <strong class="text-nordicIce-500 text-xs">4'16"</strong></span>
+                                </div>
+                                <div class="flex justify-between items-center px-2 py-1.5 bg-white rounded border border-nordicSage-100">
+                                    <span class="font-sans font-bold">800m 間歇 (I)</span>
+                                    <span>配速 4'16"/km ｜ 2 圈用時: <strong class="text-nordicIce-500 text-xs">3'25"</strong></span>
+                                </div>
+                                <div class="flex justify-between items-center px-2 py-1.5 bg-white rounded border border-nordicSage-100">
+                                    <span class="font-sans font-bold">400m 反覆 (R)</span>
+                                    <span>配速 3'58"/km ｜ 1 圈用時: <strong class="text-nordicIce-500 text-xs">95"</strong></span>
+                                </div>
+                                <div class="flex justify-between items-center px-2 py-1.5 bg-nordicSage-100/30 rounded border border-nordicSage-200">
+                                    <span class="font-sans font-bold">T 門檻配速單圈 (400m)</span>
+                                    <span>配速 4'39"/km ｜ 1 圈用時: <strong class="text-nordicSage-500 text-xs">1'51"</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Chart (TSB Model) -->
+                <div class="bg-white p-5 rounded-xl border border-nordicGray-200 flex flex-col justify-between h-full">
+                    <div>
+                        <h3 class="font-bold text-black mb-3 text-center text-sm uppercase tracking-widest border-b pb-1.5">TSB 負荷平衡與狀態趨勢圖</h3>
+                        <div class="chart-container">
+                            <canvas id="tsbChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Training Systems Explanation Box under the Chart -->
+            <div class="bg-white p-5 rounded-xl border border-nordicSage-100 space-y-4 text-black">
+                <div class="flex justify-between items-center border-b pb-2">
+                    <h4 class="font-bold text-black text-sm flex items-center"><span class="mr-2 text-base">📘</span> 專屬跑步訓練與體能調控原理</h4>
+                    <!-- Spirit Slogan 2 -->
+                    <span class="text-xs text-nordicIce-500 italic font-bold">「唯有經歷最精準的撞牆挑戰，才能贏來更寬廣的呼吸空間！」</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 leading-relaxed">
+                    <div class="space-y-2">
+                        <p class="font-bold">💡 丹尼爾斯跑力方程 (Daniels' Running Formula)</p>
+                        <p class="text-xs text-black/80">
+                            本計畫依據您 10K Sub-48、半馬 Sub-111 的歷史數據，精準換算出進階的 <strong>VDOT 44.2</strong> 作為當前備賽的核心強度指標。配合一週極簡且高質量的 3 次跑步訓練：E 配速（5'32"-6'15"）負責建立強大的有氧毛細血管網；T 配速（4'39"）負責突破乳酸門檻。在 9/6 Panasonic Run 12.5K 賽事中，將目標配速合理配置於 <strong>4'38" - 4'40" /km</strong>（完賽目標約 58:20），讓雙腿在高歌前進之餘保有穩健的乳酸控制，在後半程仍有餘裕體驗乘風馳騁的暢快。
+                        </p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="font-bold">💡 跑者專項阻力重訓 (Runner-Specific Strength)</p>
+                        <p class="text-xs text-black/80">
+                            為了確保身體結構承受週跑量的持續負荷，課表搭配了專為跑者下肢動力鏈設計的大重量、快爆發、慢離心阻力訓練。專注於 <strong>槓鈴硬舉</strong>、<strong>深蹲</strong>、<strong>單腿 RDL</strong>、<strong>保加利亞單腿蹲</strong>、以及<strong>下肢足踝剛性訓練</strong>。這能建立強健的下肢肌腱剛性（Tendon Stiffness），減少腳掌與地面的接觸時間（GCT），並大幅降低長跑造成的髕骨與足底筋膜受傷風險，幫助您用最無痛、最輕盈的方式抵達賽道終點。
+                        </p>
+                    </div>
+                </div>
+                <div class="bg-nordicSage-50 p-4 rounded-lg border border-nordicSage-100 text-xs text-black/85">
+                    <strong>📈 一週高效 3 跑與超補償：</strong> 
+                    由於您採取一週僅訓練 3 天的高效路徑，其餘時間身體可獲得最完整的休養與深層修復。這能極大化避免過度訓練與累積性疲勞。透過高品質的單次訓練（速度/門檻/LSD），並在非訓練日給予肌肉充足的超補償（Supercompensation），進而在減量期使您的 Form（狀態）直達巔峰，激發源自內在不妥協、想要挑戰極限的強大原動力！
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Schedule -->
+        <section id="tab-plan" class="tab-content">
+            <!-- Spirit Slogan 3 -->
+            <div class="bg-nordicIce-50 p-4 rounded-xl border border-nordicIce-100 mb-4 flex justify-between items-center">
+                <p class="text-xs text-black font-bold italic">
+                    ✨ <strong>鐵血鬥士叮嚀：</strong>「跑道上沒有捷徑，每一滴落下的汗水，都是你踏向 4'30\" 極致速耐力的鋼鐵印記！」
+                </p>
+                <span class="text-[10px] bg-white text-nordicIce-500 px-2 py-1 rounded-md border border-nordicIce-200">一週 3 練 • 鋼鐵意志</span>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mb-4">
+                <button class="phase-btn px-3 py-2 bg-nordicIce-500 text-white rounded-lg text-xs font-bold shadow-xs" onclick="updateSchedule('base', this)">階段 1: 基礎建立 (5/18 - 6/28)</button>
+                <button class="phase-btn px-3 py-2 bg-white text-black border border-nordicGray-200 rounded-lg text-xs font-bold shadow-xs" onclick="updateSchedule('build', this)">階段 2: 專項強化 (6/29 - 8/9)</button>
+                <button class="phase-btn px-3 py-2 bg-white text-black border border-nordicGray-200 rounded-lg text-xs font-bold shadow-xs" onclick="updateSchedule('peak', this)">階段 3: 體能巔峰 (8/10 - 8/23)</button>
+                <button class="phase-btn px-3 py-2 bg-white text-black border border-nordicGray-200 rounded-lg text-xs font-bold shadow-xs" onclick="updateSchedule('taper', this)">階段 4: 賽前減量 (8/24 - 9/06)</button>
+            </div>
+
+            <div class="bg-white rounded-xl border border-nordicSage-100 overflow-hidden">
+                <div class="overflow-x-auto table-scroll">
+                    <table class="w-full text-left border-collapse min-w-[800px] text-xs">
+                        <thead class="bg-nordicSage-50 text-black font-bold border-b border-nordicSage-200">
+                            <tr>
+                                <th class="p-3 w-16">星期</th>
+                                <th class="p-3 w-40 text-center">項目</th>
+                                <th class="p-3">訓練內容</th>
+                                <th class="p-3 w-52">體感與跑者目標</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-body" class="divide-y divide-nordicSage-50 font-sans text-black">
+                            <!-- Populated dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3: Strength -->
+        <section id="tab-strength" class="tab-content">
+            <div class="mb-6 border-b border-nordicGray-200 pb-4">
+                <h2 class="text-xl font-bold text-black tracking-tight flex items-center gap-2">
+                    🏋️ 跑者專項阻力與骨盆剛性訓練
+                </h2>
+                <p class="text-black/75 text-sm italic">專注於下肢動力鏈傳導剛性、小腿與足踝剛性及核心抗旋轉穩定。</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-xs text-black">
+                <!-- Box 1 -->
+                <div class="bg-white p-5 rounded-xl border-t-4 border-t-nordicSage-500 shadow-xs flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center border-b pb-1.5 mb-1">
+                            <h4 class="font-extrabold text-black text-sm">硬舉與足踝剛性</h4>
+                            <span class="text-[10px] bg-nordicSage-50 text-nordicSage-500 px-2 py-0.5 rounded font-bold">後側鏈強化</span>
+                        </div>
+                        
+                        <!-- Premium Nordic Minimalist Line Art SVG for Deadlift and Ankle Stiffness -->
+                        <div class="w-full h-24 bg-nordicGray-50 rounded-lg flex items-center justify-center p-2 border border-nordicGray-100">
+                            <svg class="w-16 h-16 text-nordicSage-500" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <!-- Floor line -->
+                                <line x1="8" y1="56" x2="56" y2="56" stroke="#CDDDD4" stroke-width="1.25" />
+                                <!-- Barbell shaft -->
+                                <line x1="16" y1="46" x2="48" y2="46" stroke="#2A2B2A" stroke-width="2" />
+                                <!-- Barbell plates (Symmetric & realistic) -->
+                                <rect x="12" y="38" width="4" height="16" rx="1" fill="#2A2B2A" />
+                                <rect x="48" y="38" width="4" height="16" rx="1" fill="#2A2B2A" />
+                                <!-- Lifter hinge posture -->
+                                <circle cx="36" cy="20" r="2.5" fill="#2A2B2A" /> <!-- Head -->
+                                <path d="M36 22.5 L26 32 L34 46 L34 56" stroke="#2A2B2A" stroke-width="1.75" /> <!-- Spine, Hips, Thighs, Shins -->
+                                <line x1="33" y1="25" x2="32" y2="46" stroke="#748E81" stroke-width="1.5" /> <!-- Arms -->
+                                <path d="M25 32 C 22 36, 26 42, 34 46" stroke="#D47E59" stroke-width="1" stroke-dasharray="2 2" /> <!-- Force chain curve -->
+                            </svg>
+                        </div>
+
+                        <div class="p-3 bg-nordicSage-50/40 rounded-lg border border-nordicSage-100">
+                            <strong class="block text-xs font-bold">傳統槓鈴硬舉 (Deadlift)</strong>
+                            <p class="leading-relaxed mt-1">4 組 x 5 次 (75-80% 1RM)。建立下肢後側鏈（臀大肌、膕繩肌）最大力量，改善推蹬爆發力，預防後程因疲勞導致的骨盆塌陷。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-semibold">負重提踵/小腿頂起 (Calf Raise)</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">3 組 x 15 次。在階梯緣進行完整活動度收縮。強化跟腱與阿基里斯腱儲存與釋放彈性能量的能力（Tendon stiffness）。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-semibold">懸垂舉腿 / 懸吊捲腹</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">3 組 x 12-15 次。鍛鍊深層髂腰肌與核心，維持抬腿效率，確保在高配速下骨盆處於中立位置。</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Box 2 -->
+                <div class="bg-white p-5 rounded-xl border-t-4 border-t-nordicIce-200 shadow-xs flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center border-b pb-1.5 mb-1">
+                            <h4 class="font-extrabold text-black text-sm">深蹲與擺臂抗拉</h4>
+                            <span class="text-[10px] bg-nordicIce-50 text-nordicIce-500 px-2 py-0.5 rounded font-bold">股四頭與背部穩定</span>
+                        </div>
+
+                        <!-- Premium Nordic Minimalist Line Art SVG for Squat Stiffness -->
+                        <div class="w-full h-24 bg-nordicGray-50 rounded-lg flex items-center justify-center p-2 border border-nordicGray-100">
+                            <svg class="w-16 h-16 text-nordicIce-500" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <!-- Floor line -->
+                                <line x1="8" y1="56" x2="56" y2="56" stroke="#CDDDD4" stroke-width="1.25" />
+                                <!-- Barbell on back -->
+                                <line x1="16" y1="28" x2="48" y2="28" stroke="#2A2B2A" stroke-width="2" />
+                                <rect x="12" y="20" width="4" height="16" rx="1" fill="#2A2B2A" />
+                                <rect x="48" y="20" width="4" height="16" rx="1" fill="#2A2B2A" />
+                                <!-- Lifter squat posture -->
+                                <circle cx="32" cy="21" r="2.5" fill="#2A2B2A" /> <!-- Head -->
+                                <path d="M32 23.5 L26 38 L42 43 L34 56" stroke="#2A2B2A" stroke-width="1.75" /> <!-- Spine, deep hip, parallel thigh, shin -->
+                                <path d="M32 28 L28 32 L32 36" stroke="#547C8F" stroke-width="1.25" /> <!-- Arms gripping bar -->
+                            </svg>
+                        </div>
+
+                        <div class="p-3 bg-nordicSage-50/40 rounded-lg border border-nordicSage-100">
+                            <strong class="block text-xs font-bold">槓鈴深蹲 (Back Squat)</strong>
+                            <p class="leading-relaxed mt-1">4 組 x 8 次。強化股四頭肌，這是跑步落地時吸收衝擊力與提供離心緩衝的主要肌群，能有效縮短觸地時間（GCT）。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-semibold">槓鈴/啞鈴俯身划船 (Row)</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">4 組 x 8 次。強化擺臂時所需的背部（闊背肌、斜方肌）穩定度，防止長跑後半程駝背與上身左右晃動，節省無效體力耗損。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-semibold">負重農夫走路 (Farmer Walk)</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">4 趟 x 40 公尺。建立手腕、前臂以及肩胛抗拉能力，最重要的是在行走過程中鍛鍊足踝與足弓的側向抗扭剛性。</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Box 3 -->
+                <div class="bg-white p-5 rounded-xl border-t-4 border-t-nordicIce-500 shadow-xs flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center border-b pb-1.5 mb-1">
+                            <h4 class="font-extrabold text-black text-sm">單邊穩定與蹬伸爆發</h4>
+                            <span class="text-[10px] bg-nordicSage-50 text-nordicSage-500 px-2 py-0.5 rounded font-bold">骨盆與膝防護</span>
+                        </div>
+
+                        <!-- Premium Nordic Minimalist Line Art SVG for Bulgarian Split Squat Balance -->
+                        <div class="w-full h-24 bg-nordicGray-50 rounded-lg flex items-center justify-center p-2 border border-nordicGray-100">
+                            <svg class="w-16 h-16 text-nordicIce-500" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                                <!-- Floor line -->
+                                <line x1="8" y1="56" x2="56" y2="56" stroke="#CDDDD4" stroke-width="1.25" />
+                                <!-- Bench -->
+                                <rect x="44" y="42" width="12" height="14" rx="1" stroke="#CDDDD4" stroke-width="1.25" fill="#FAF9F9" />
+                                <!-- Lifter -->
+                                <circle cx="28" cy="18" r="2.5" fill="#2A2B2A" /> <!-- Head -->
+                                <path d="M22 56 L22 44 L28 36" stroke="#2A2B2A" stroke-width="1.75" /> <!-- Front leg -->
+                                <line x1="28" y1="36" x2="28" y2="24" stroke="#2A2B2A" stroke-width="1.75" /> <!-- Torso -->
+                                <path d="M28 36 L36 44 L44 42" stroke="#2A2B2A" stroke-width="1.25" /> <!-- Back leg resting on bench -->
+                                <line x1="28" y1="24" x2="28" y2="38" stroke="#547C8F" stroke-width="1.25" /> <!-- Arm holding weight -->
+                                <!-- Dumbbell -->
+                                <line x1="24" y1="38" x2="32" y2="38" stroke="#2A2B2A" stroke-width="1.5" />
+                                <rect x="23" y="35" width="2" height="6" rx="0.5" fill="#2A2B2A" />
+                                <rect x="31" y="35" width="2" height="6" rx="0.5" fill="#2A2B2A" />
+                            </svg>
+                        </div>
+
+                        <div class="p-3 bg-nordicSage-50/40 rounded-lg border border-nordicSage-100">
+                            <strong class="block text-xs font-bold">單腿 RDL (Single-Leg RDL)</strong>
+                            <p class="leading-relaxed mt-1">3 組 x 10 次/側。修正跑步單側動力鏈失衡，增強臀中肌與大腿後側膕繩肌協調，極為關鍵的跑者穩定性動作。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-bold text-nordicIce-500">啞鈴深蹲跳 (Dumbbell Squat Jump)</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">3 組 x 8 次。手持極輕啞鈴（或僅自重），著重在「落地後快速離心制動並立刻蹬起」，活化肌肉牽張反射（SSC）。</p>
+                        </div>
+                        <div class="p-2">
+                            <strong class="block text-xs font-semibold">保加利亞單腿蹲 (Bulgarian Squat)</strong>
+                            <p class="text-black/80 leading-relaxed mt-1">3 組 x 10 次/側。高度模擬跑步單腳支撐時的受力狀態，強化臀大肌及膝關節側向穩定度，徹底解決膝蓋髕骨不適。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Backups Column (跑者輔助備用動作) -->
+            <div class="bg-white p-5 rounded-xl border border-nordicSage-100 text-xs text-black">
+                <h3 class="font-bold text-sm mb-3 flex items-center border-b pb-1.5">
+                    <span class="mr-2">♻️</span> 跑者專項輔助動作庫 (自主訓練時可靈活切換)
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
+                    <div class="p-4 bg-nordicSage-50 rounded-xl border border-nordicSage-100">
+                        <span class="text-nordicSage-500 font-extrabold block text-xs mb-1.5">下肢離心與跟腱剛性</span>
+                        <ul class="space-y-1 leading-relaxed">
+                            <li><strong>• 阻力帶負重登階：</strong>3 組 x 12 次。深度鍛鍊臀大肌，改善髖關節伸展。</li>
+                            <li><strong>• 單腳足踝小幅跳躍：</strong>3 組 x 20 下。著重腳踝不發出聲響、迅速回彈，鍛鍊腳踝足弓彈性。</li>
+                        </ul>
+                    </div>
+                    <div class="p-4 bg-nordicSage-50 rounded-xl border border-nordicSage-100">
+                        <span class="text-nordicIce-500 font-extrabold block text-xs mb-1.5">臀大肌活化與髖外展</span>
+                        <ul class="space-y-1 leading-relaxed">
+                            <li><strong>• 彈力帶側向怪獸走路：</strong>3 組 x 15 步。強化臀中肌，防止跑步落地時膝關節向內扣（膝外翻代償）。</li>
+                            <li><strong>• 仰臥單腿臀橋：</strong>3 組 x 15 次/側。喚醒久坐無力的臀大肌，加強跑步推蹬與骨盆水平穩定力。</li>
+                        </ul>
+                    </div>
+                    <div class="p-4 bg-nordicSage-50 rounded-xl border border-nordicSage-100">
+                        <span class="font-extrabold block text-xs mb-1.5">擺臂核心與軀幹剛性</span>
+                        <ul class="space-y-1 leading-relaxed">
+                            <li><strong>• 啞鈴單臂支撐划船：</strong>4 組 x 8 次/側。建立核心與背部的抗扭轉力（Anti-rotation）。</li>
+                            <li><strong>• 側棒式帶轉體：</strong>3 組 x 12 次/側。強化腹內外斜肌，提升高步頻跑步時的軀幹對稱剛性。</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: Schedule -->
+        <section id="tab-plan" class="tab-content">
+            <div class="bg-white rounded-xl border border-nordicSage-100 overflow-hidden">
+                <div class="overflow-x-auto table-scroll">
+                    <table class="w-full text-left border-collapse min-w-[800px] text-xs">
+                        <thead class="bg-nordicSage-50 text-black font-bold border-b border-nordicSage-200">
+                            <tr>
+                                <th class="p-3 w-16">星期</th>
+                                <th class="p-3 w-40 text-center">項目</th>
+                                <th class="p-3">訓練內容</th>
+                                <th class="p-3 w-52">體感與跑者目標</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-body" class="divide-y divide-nordicSage-50 font-sans text-black">
+                            <!-- Populated dynamically by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 4: Training Tracker -->
+        <section id="tab-track" class="tab-content">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 text-xs text-black">
+                <!-- Input Column -->
+                <div class="lg:col-span-1 bg-white p-6 rounded-2xl border border-nordicSage-100 shadow-xs">
+                    <h3 class="font-bold mb-4 flex items-center"><span class="mr-2">📝</span> 紀錄今日跑步 / 肌力訓練</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-nordicGray-800 mb-1">訓練類型</label>
+                            <select id="log-type" class="w-full bg-nordicSage-50 border border-nordicSage-200 rounded p-2 text-sm outline-none text-black">
+                                <option value="interval">結構間歇 (Interval)</option>
+                                <option value="tempo">乳酸門檻 (Tempo)</option>
+                                <option value="lsd">長距離 (LSD)</option>
+                                <option value="strength">跑者重訓 (Strength)</option>
+                                <option value="easy">主動恢復/E跑</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-nordicGray-800 mb-1 font-mono">日期</label>
+                            <input type="date" id="log-date" class="w-full bg-nordicSage-50 border border-nordicSage-200 rounded p-2 text-sm outline-none text-black">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-nordicGray-800 mb-1">今日體感與心得紀錄</label>
+                            <textarea id="log-notes" rows="8" class="w-full bg-nordicSage-50 border border-nordicSage-200 rounded p-2 text-xs outline-none text-black" placeholder="今天在體育場練習的心流體驗、跑表數據（距離/時間/配速/步頻）或重訓的肌肉感覺如何？..."></textarea>
+                        </div>
+                        <button onclick="saveTrainingLog()" class="w-full bg-nordicIce-500 text-white py-3 rounded-xl text-sm font-bold shadow-xs hover:bg-nordicIce-600 transition-transform active:scale-95">儲存今日紀錄</button>
+                    </div>
+                </div>
+
+                <!-- History Column -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="bg-white p-4 rounded-xl border border-nordicSage-100 text-center shadow-xs">
+                            <span class="block text-xs font-bold text-nordicGray-800">專項間歇</span>
+                            <strong id="stat-interval" class="text-xl text-nordicIce-500">0</strong>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-nordicSage-100 text-center shadow-xs">
+                            <span class="block text-xs font-bold text-nordicGray-800">門檻跑</span>
+                            <strong id="stat-tempo" class="text-xl text-nordicSage-500">0</strong>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-nordicSage-100 text-center shadow-xs">
+                            <span class="block text-xs font-bold text-nordicGray-800">長距離 (LSD)</span>
+                            <strong id="stat-lsd" class="text-xl text-nordicIce-600">0</strong>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-nordicSage-100 text-center shadow-xs">
+                            <span class="block text-xs font-bold text-nordicGray-800">肌力重訓</span>
+                            <strong id="stat-strength" class="text-xl text-nordicGray-800">0</strong>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl border border-nordicSage-100 overflow-hidden shadow-xs">
+                        <div class="bg-nordicSage-50 p-4 border-b flex justify-between items-center">
+                            <h3 class="font-bold text-black text-sm">歷史訓練紀錄 (Panasonic 12.5K 週期)</h3>
+                            <button onclick="promptClearAllLogs()" class="text-xs text-red-600 hover:underline font-bold">清空所有紀錄</button>
+                        </div>
+                        <div id="log-list" class="divide-y max-h-[480px] overflow-y-auto">
+                            <p id="empty-message" class="p-8 text-center text-nordicGray-800 text-sm italic leading-relaxed">目前無紀錄。歡迎手動輸入今天跑步、體育場訓練心得或健身房重訓感受，開始記錄 12.5K 課表進度！</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Bottom Spirit Slogan Card (Hot-Blooded Slogan) -->
+    <div class="max-w-6xl mx-auto w-full px-6 mb-8 text-black">
+        <div class="nordic-gradient border border-nordicSage-200 rounded-2xl p-6 shadow-xs flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="space-y-1.5 text-center md:text-left">
+                <h4 class="font-black text-black text-sm flex items-center justify-center md:justify-start gap-1">
+                    ⚡ <span>跑者鋼鐵戰意：極致專注，強者無懼！</span>
+                </h4>
+                <p class="text-xs text-black max-w-2xl leading-relaxed">
+                    我們在風雨中磨礪意志，在痛苦的間歇中鍛鍊靈魂。不找藉口，不畏酸痛，因為我們深信：每一次突破極限的推蹬，都是向 Sub-45 終極目標邁進的鋼鐵步伐！戰勝昨天的自己，衝就對了！
+                </p>
+            </div>
+            <div class="bg-white border border-nordicSage-200 px-4 py-3 rounded-xl text-center flex-shrink-0 shadow-xs">
+                <span class="text-[10px] text-nordicGray-800 block uppercase tracking-wider font-semibold">當前戰意燃值</span>
+                <span class="text-xs font-black text-nordicIce-500 font-mono">10K Sub-45 的絕對信念</span>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-nordicGray-800 text-white py-8 px-6 text-center text-xs mt-auto">
+        <p>© 2026 奔向Sub45-10K 備賽與紀錄系統 ｜ 跑者專屬戰力調校基地</p>
+    </footer>
+
+    <script>
+        // 10K Sub-45 / 12.5K Sub-58:20 專屬一週 3 跑跑步訓練計畫
+        // T-Pace: 4'39"/km, I-Pace: 4'16"/km, R-Pace: 3'58"/km, E-Pace: 5'32"-6'15"/km
+        const schedules = {
+            base: [
+                { d: "一", t: "跑者重訓 (一)", c: "傳統槓鈴硬舉 (4x5) + 提踵與懸垂舉腿核心", g: "建立下肢剛性基底，為速度訓練預防下背及跟腱不適" },
+                { d: "二", t: "速度反覆跑 (R)", c: "400m 快速反覆跑 x 8 趟 (每趟目標 95 秒，趟間恢復慢走 2 分鐘)", g: "核心跑日：建立 3'58\" 跑步經濟性，活化神經突觸與快縮肌募集" },
+                { d: "三", t: "完全休息", c: "完全休養、滾筒與筋膜球庫按摩拉伸", g: "高效率一週 3 跑的核心：給予肌纖維 100% 的主動超補償修復" },
+                { d: "四", t: "輕鬆跑 (E)", c: "6.0 - 8.0 km 輕鬆有氧跑 (配速 5'32\" - 6'15\")", g: "核心跑日：微血管網擴張、心肌排血量與基礎耐力奠定" },
+                { d: "五", t: "跑者重訓 (二)", c: "槓鈴深蹲 (4x8) + 單腿 RDL (3x10) + 保加利亞單腿蹲 (3x10)", g: "單側抗扭轉與骨盆防護，預防跑步落地代償" },
+                { d: "六", t: "長距離慢跑 (LSD)", c: "有氧長距離慢跑 10.0 - 12.0 km (恆定 E 配速 5'40\" - 6'00\")", g: "核心跑日：脂肪氧化與粒線體代謝能累積，為 12.5K 賽事建構續航耐力" },
+                { d: "日", t: "完全休息", c: "放鬆與拉伸、熱敷", g: "重置中樞神經與軟組織疲勞，迎接下一週高效循環" }
+            ],
+            build: [
+                { d: "一", t: "跑者重訓 (一)", c: "傳統硬舉 (4x5 提升強度) + 負重提踵 (3x15) + 核心鍛鍊", g: "後側鏈與足踝跟腱剛性建立，提升高速奔跑時的推進效率" },
+                { d: "二", t: "補氧間歇跑 (I)", c: "800m 高強度間歇 x 5 趟 (每趟目標 3'25\"，趟間慢跑 3 分鐘恢復)", g: "核心跑日：心肺攝氧容積開發，擴張高氧債狀態下的抗乳酸極限" },
+                { d: "三", t: "完全休息", c: "肌肉拉伸與休養、熱水浴", g: "肌肉疲勞排除，幫助高張力間歇訓練後的深層恢復" },
+                { d: "四", t: "乳酸門檻跑 (T)", c: "6.0 km 穩態乳酸門檻跑 (配速鎖定 4'39\"/km，心肺穩定不爆掉)", g: "核心跑日：提高清除乳酸的排酸臨界點，鎖定賽事後半段的穩態巡航速" },
+                { d: "五", t: "跑者重訓 (二)", c: "槓鈴深蹲 + 俯身划船 + 農夫走路 + 保加利亞單腿蹲", g: "強化股四頭落地緩衝吸收衝擊，擺臂背部與足踝剛性" },
+                { d: "六", t: "長距離慢跑 (LSD)", c: "長距離跑 14.0 km (前 12k 配 E，最後 2k 漸進加速至 T 配速 4'39\")", g: "核心跑日：專項耐力進階，模擬賽事後半段在疲勞下的動力維持" },
+                { d: "日", t: "完全休息", c: "充分睡眠、按摩放鬆", g: "全力儲備糖原、降低皮質醇，維持健康的免疫機能" }
+            ],
+            peak: [
+                { d: "一", t: "跑者重訓 (一)", c: "傳統硬舉 / 深蹲 (3-5RM 高負荷，組數減少) + 彈性跳躍", g: "賽前神經最上限募集與跟腱剛性，避免過度疲勞" },
+                { d: "二", t: "最大攝氧間歇 (I)", c: "1000m 專項間歇 x 5 趟 (每趟目標 4'16\"，趟間慢走 4 分鐘)", g: "核心跑日：心肺極限最後突破，定速 4'16\" 的體感精細化" },
+                { d: "三", t: "完全休息", c: "大腿與小腿伸展放鬆", g: "完全消除前日最大攝氧無氧乳酸債，活化肌肉血管" },
+                { d: "四", t: "專項賽速模擬 (P)", c: "10 km 專項賽速定速跑 (定速 4'30\"/km，挑戰 Sub-45 分)", g: "核心跑日：賽前 10K 模擬驗收，建立大腦與肌肉對 4'30\" 均速的絕對適應" },
+                { d: "五", t: "跑者重訓 (二)", c: "自重保加利亞單腿蹲 + 單腳足踝回彈跳 + 核心抗扭旋轉", g: "最後步態對齊調校，喚醒臀部與足踝推蹬發力" },
+                { d: "六", t: "頂規長距離有氧", c: "長距離慢跑 15.0 km (配速控制於 5'35\" - 5'50\"/km)", g: "核心跑日：最後長距離耐力儲備，完成 12.5K 的超額體能上限與備賽信心" },
+                { d: "日", t: "完全休息", c: "積極超補優質食物、充足睡眠", g: "引導「超補償效應」爆發，修復深層微損傷，迎接下一週減量" }
+            ],
+            taper: [
+                { d: "一", t: "肌肉剛性維持", c: "保加利亞單腿蹲 (自重 3x8) + 單腿 RDL + 核心抗扭 (容量減半)", g: "在中樞神經不疲勞的前期下，鎖定大腿與臀部肌群張力" },
+                { d: "二", t: "攝氧激活間歇 (I)", c: "1000m x 2 趟 (目標 4'16\"/km，每趟間完全休息 5 分鐘)", g: "核心跑日：維持心肺攝氧活性與跑感，同時清除體能消耗" },
+                { d: "三", t: "完全休息", c: "全天修養，滾筒與拉伸", g: "給予受損肌纖維 100% 完整修復週期" },
+                { d: "四", t: "目標配速定格 (P)", c: "3 km 目標賽速跑 (4'30\"/km) + 短衝刺 100m x 3 趟", g: "核心跑日：將 9/6 賽事之 4'30\" 配速體感牢牢寫入肌肉記憶中" },
+                { d: "五", t: "完全休息", c: "積極補充足量優質碳水化合物與水分", g: "蓄滿肌肉與肝臟醣原油箱，為週日高爆發儲能" },
+                { d: "六", t: "賽前神經喚醒", c: "15 分鐘輕鬆慢跑 + 400m 賽速跑 1 趟 (預熱身體不累積疲勞)", g: "活化神經、調動肌肉興奮感，調整最佳起跑狀態" },
+                { d: "日", t: "🎯 驗收日", c: "9/6 Panasonic Run 12.5K 賽事 (配速 4'38\" - 4'40\"/km，目標 58:20 內完賽)", g: "核心跑日：實現 10k Sub-45 等同實力！打破個人最佳 PB！" }
+            ]
+        };
+
+        // Initialize local storage logs
+        let trainingLogs = JSON.parse(localStorage.getItem('sub45_training_logs')) || [];
+
+        // Global Toast Notification Utility (Replaces alert)
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgClass = type === 'error' ? 'bg-red-500' : 'bg-nordicGray-800';
+            
+            toast.className = `${bgClass} text-white text-xs font-bold px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 transform translate-y-2 opacity-0 transition-all duration-300`;
+            toast.innerHTML = `
+                <span>${type === 'error' ? '❌' : '✅'}</span>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Trigger animation
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 50);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // Custom Modal Utility (Replaces confirm)
+        let modalConfirmCallback = null;
+        function showCustomModal(title, text, onConfirm) {
+            const modal = document.getElementById('custom-modal');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-text').innerText = text;
+            modal.classList.remove('hidden');
+            
+            modalConfirmCallback = () => {
+                onConfirm();
+                closeCustomModal();
+            };
+        }
+
+        function closeCustomModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            modalConfirmCallback = null;
+        }
+
+        document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+            if (modalConfirmCallback) modalConfirmCallback();
+        });
+        document.getElementById('modal-cancel-btn').addEventListener('click', closeCustomModal);
+
+        function switchTab(tabId, el) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(n => n.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if(el) el.classList.add('active');
+        }
+
+        function updateSchedule(phase, el) {
+            const tbody = document.getElementById('schedule-body');
+            tbody.innerHTML = '';
+            schedules[phase].forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-nordicSage-100 transition border-b border-nordicSage-100';
+                tr.innerHTML = `
+                    <td class="p-3 font-bold text-black whitespace-nowrap">週${item.d}</td>
+                    <td class="p-3 text-center"><span class="px-2 py-1 bg-white border border-nordicGray-200 rounded text-xs font-bold text-black block">${item.t}</span></td>
+                    <td class="p-3 font-bold text-black leading-relaxed">${item.c}</td>
+                    <td class="p-3 text-xs italic text-nordicGray-300 leading-relaxed">${item.g}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+            document.querySelectorAll('.phase-btn').forEach(b => {
+                b.classList.remove('bg-nordicIce-500', 'text-white');
+                b.classList.add('bg-white', 'text-black');
+            });
+            if(el) { el.classList.add('bg-nordicIce-500', 'text-white'); el.classList.remove('bg-white', 'text-black'); }
+        }
+
+        // Render Logs & Update stats
+        function renderLogs() {
+            const list = document.getElementById('log-list');
+            list.innerHTML = '';
+            
+            const stats = { interval: 0, tempo: 0, lsd: 0, strength: 0, easy: 0 };
+
+            if (trainingLogs.length === 0) {
+                list.innerHTML = `<p id="empty-message" class="p-8 text-center text-nordicGray-300 text-sm italic leading-relaxed">目前無紀錄。歡迎手動輸入今天跑步、體育場訓練心得或健身房重訓感受，開始記錄 12.5K 課表進度！</p>`;
+            } else {
+                [...trainingLogs].reverse().forEach((log) => {
+                    const div = document.createElement('div');
+                    div.className = 'p-4 hover:bg-nordicSage-50 transition border-l-4 border-l-nordicIce-500 bg-white mb-2 rounded-xl border border-nordicGray-200';
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2 py-0.5 bg-nordicGray-800 text-white rounded text-[10px] font-bold uppercase tracking-wider">${log.type}</span>
+                            <span class="text-[11px] text-nordicGray-300 font-mono">${log.date}</span>
+                        </div>
+                        <h4 class="font-bold text-black text-sm">今日訓練紀錄 - ${log.typeText}</h4>
+                        <p class="text-xs text-black mt-2 italic leading-relaxed font-semibold">${log.notes}</p>
+                    `;
+                    list.appendChild(div);
+                    
+                    if(stats.hasOwnProperty(log.type)) {
+                        stats[log.type]++;
+                    }
+                });
+            }
+
+            // Update dashboards
+            document.getElementById('stat-interval').innerText = stats.interval;
+            document.getElementById('stat-tempo').innerText = stats.tempo;
+            document.getElementById('stat-lsd').innerText = stats.lsd;
+            document.getElementById('stat-strength').innerText = stats.strength;
+        }
+
+        function saveTrainingLog() {
+            const typeSelect = document.getElementById('log-type');
+            const typeValue = typeSelect.value;
+            const typeText = typeSelect.options[typeSelect.selectedIndex].text;
+            const notes = document.getElementById('log-notes').value;
+            const date = document.getElementById('log-date').value || new Date().toISOString().split('T')[0];
+            
+            if(!notes) {
+                showToast('請輸入訓練心得再儲存功能喔！', 'error');
+                return;
+            }
+
+            const newLog = {
+                type: typeValue,
+                typeText: typeText,
+                notes: notes,
+                date: date
+            };
+
+            trainingLogs.push(newLog);
+            localStorage.setItem('sub45_training_logs', JSON.stringify(trainingLogs));
+            
+            renderLogs();
+            showToast('成功存儲今日訓練心得！');
+
+            // Reset UI
+            document.getElementById('log-notes').value = '';
+        }
+
+        function promptClearAllLogs() {
+            showCustomModal(
+                '確認清空紀錄', 
+                '確定要清空 2026 週期的所有訓練紀錄嗎？此動作將會永遠清除瀏覽器的本地快取。', 
+                () => {
+                    trainingLogs = [];
+                    localStorage.removeItem('sub45_training_logs');
+                    renderLogs();
+                    showToast('已清空所有訓練歷史數據。');
+                }
+            );
+        }
+
+        window.onload = () => {
+            updateSchedule('base');
+            initCharts();
+            renderLogs();
+        };
+
+        function initCharts() {
+            const ctx = document.getElementById('tsbChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['5月','6月','7月','8月','減量期','賽日(9/6)'],
+                    datasets: [
+                        { label: '體能 (Fitness)', data: [20, 50, 78, 92, 90, 96], borderColor: '#748E81', tension: 0.4 },
+                        { label: '疲勞 (Fatigue)', data: [10, 60, 80, 95, 30, 3], borderColor: '#547C8F', borderDash: [5, 5], tension: 0.4 },
+                        { label: '狀態 (Form)', data: [10, -10, -2, -3, 60, 93], borderColor: '#adb5bd', borderWidth: 1, fill: true, backgroundColor: 'rgba(116, 142, 129, 0.04)', tension: 0.4 }
+                    ]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, 
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+                    scales: { 
+                        y: { display: true, ticks: { font: { size: 9 } } }, 
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } } 
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
