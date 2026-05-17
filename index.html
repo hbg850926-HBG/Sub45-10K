@@ -3,7 +3,7 @@
 <head>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Sub45-12.5K">
+    <meta name="apple-mobile-web-app-title" content="Sub45-10K">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="apple-touch-icon" sizes="152x152" href="icon.png">
     <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
@@ -17,7 +17,7 @@
             theme: {
                 extend: {
                     colors: {
-                        vibrantBg: '#FFFDF0',       // 燕麥陽光暖白  
+                        vibrantBg: '#FFFDF0',       // 燕麥陽光暖白
                         vibrantOrange: {
                             50: '#FFF8F5',
                             100: '#FFEBE1',
@@ -449,7 +449,7 @@
                         <span class="text-vibrantYellow-500 font-extrabold block text-xs mb-1.5">下肢離心與跟腱剛性</span>
                         <ul class="space-y-1 leading-relaxed">
                             <li><strong>• 阻力帶負重登階：</strong>3 組 x 12 次。深度鍛鍊臀大肌，改善髖關節伸展。</li>
-                            <li><strong>• 單腳足踝小幅跳躍：</strong>3 組 x 20 下。著重腳踝不發出聲響、迅速回彈，鍛鍊腳踝足弓彈性。</li>
+                            <li><strong>• 單腳足踝小幅跳躍：</strong>3 組 x 20 下。著重腳踝不發出聲響、迅速回彈，鍛鍊腳踝足弓彈性.</li>
                         </ul>
                     </div>
                     <div class="p-4 bg-vibrantYellow-50 rounded-xl border border-vibrantYellow-100">
@@ -512,6 +512,19 @@
                             <label class="block text-xs font-bold text-vibrantGray-800 mb-1 font-mono">日期</label>
                             <input type="date" id="log-date" class="w-full bg-vibrantYellow-50 border border-vibrantYellow-200 rounded p-2 text-sm outline-none text-black transition-all">
                         </div>
+                        
+                        <!-- NEW: Image Upload Section -->
+                        <div>
+                            <label class="block text-xs font-bold text-vibrantGray-800 mb-1">上傳訓練照片 / 數據截圖</label>
+                            <input type="file" id="log-image" accept="image/*" class="w-full bg-vibrantYellow-50 border border-vibrantYellow-200 rounded p-2 text-xs outline-none text-black file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-vibrantOrange-100 file:text-vibrantOrange-600 hover:file:bg-vibrantOrange-200 transition-all">
+                            
+                            <!-- Image Preview Area -->
+                            <div id="image-preview-container" class="hidden mt-3 relative border border-vibrantYellow-200 rounded-lg overflow-hidden bg-vibrantGray-50 p-1">
+                                <img id="image-preview" src="" class="max-h-32 mx-auto object-contain rounded" alt="上傳預覽">
+                                <button type="button" onclick="removeSelectedImage()" class="absolute top-1.5 right-1.5 bg-black/70 text-white w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold hover:bg-black/90 transition-colors" title="移除圖片">✕</button>
+                            </div>
+                        </div>
+
                         <div>
                             <label class="block text-xs font-bold text-vibrantGray-800 mb-1">今日體感與心得紀錄</label>
                             <textarea id="log-notes" rows="8" class="w-full bg-vibrantYellow-50 border border-vibrantYellow-200 rounded p-2 text-xs outline-none text-black transition-all" placeholder="今天在體育場練習的心流體驗、跑表數據（距離/時間/配速/步頻）或重訓的肌肉感覺如何？..."></textarea>
@@ -626,6 +639,7 @@
         // Initialize local storage logs
         let trainingLogs = JSON.parse(localStorage.getItem('sub45_training_logs')) || [];
         let editingIndex = -1; // -1 indicates not editing, otherwise holds original index of element
+        let selectedImageBase64 = ''; // Temporary container for compressed uploaded image
 
         // Global Toast Notification Utility (Replaces alert)
         function showToast(message, type = 'success') {
@@ -722,6 +736,16 @@
                 const mappedLogs = trainingLogs.map((log, index) => ({ ...log, originalIndex: index }));
                 
                 [...mappedLogs].reverse().forEach((log) => {
+                    // Inject image if it exists in current log
+                    let imageHtml = '';
+                    if (log.image) {
+                        imageHtml = `
+                            <div class="mt-3 overflow-hidden rounded-lg border border-vibrantGray-200 bg-vibrantGray-50">
+                                <img src="${log.image}" class="max-h-64 mx-auto object-contain rounded" alt="訓練照片">
+                            </div>
+                        `;
+                    }
+
                     const div = document.createElement('div');
                     div.className = 'p-4 hover:bg-vibrantYellow-50 transition border-l-4 border-l-vibrantOrange-500 bg-white mb-2 rounded-xl border border-vibrantGray-200 hover:shadow-xs transition-all duration-300';
                     div.innerHTML = `
@@ -739,6 +763,7 @@
                         </div>
                         <h4 class="font-bold text-black text-sm">今日訓練紀錄 - ${log.typeText}</h4>
                         <p class="text-xs text-black mt-2 italic leading-relaxed font-semibold">${log.notes}</p>
+                        ${imageHtml}
                     `;
                     list.appendChild(div);
                     
@@ -753,6 +778,57 @@
             document.getElementById('stat-tempo').innerText = stats.tempo;
             document.getElementById('stat-lsd').innerText = stats.lsd;
             document.getElementById('stat-strength').innerText = stats.strength;
+        }
+
+        // Image Selection & Client-Side compression to JPEG 0.75 (Prevents localStorage Quota Exceeded)
+        function handleImageSelection(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Cap max resolution to 1000px for local persistence budget safety
+                    const max_size = 1000;
+                    if (width > height) {
+                        if (width > max_size) {
+                            height *= max_size / width;
+                            width = max_size;
+                        }
+                    } else {
+                        if (height > max_size) {
+                            width *= max_size / height;
+                            height = max_size;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // High performance lightweight JPEG compression (0.75 Quality)
+                    selectedImageBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                    
+                    // Render into active preview widget
+                    document.getElementById('image-preview').src = selectedImageBase64;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                };
+                img.src = evt.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeSelectedImage() {
+            selectedImageBase64 = '';
+            document.getElementById('log-image').value = '';
+            document.getElementById('image-preview').src = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
         }
 
         function saveTrainingLog() {
@@ -771,7 +847,8 @@
                 type: typeValue,
                 typeText: typeText,
                 notes: notes,
-                date: date
+                date: date,
+                image: selectedImageBase64 // Store base64 inside actual log
             };
 
             if (editingIndex === -1) {
@@ -783,9 +860,16 @@
                 cancelEditLog(); // reset editingIndex and UI
             }
 
-            localStorage.setItem('sub45_training_logs', JSON.stringify(trainingLogs));
+            try {
+                localStorage.setItem('sub45_training_logs', JSON.stringify(trainingLogs));
+            } catch (error) {
+                showToast('瀏覽器儲存空間已滿，請刪除部分過往紀錄照片。', 'error');
+                console.error("Storage quota full", error);
+            }
+
             renderLogs();
             document.getElementById('log-notes').value = '';
+            removeSelectedImage();
         }
 
         function startEditLog(index) {
@@ -795,6 +879,15 @@
             document.getElementById('log-type').value = log.type;
             document.getElementById('log-date').value = log.date;
             document.getElementById('log-notes').value = log.notes;
+            
+            // Render existing image back to state & preview
+            if (log.image) {
+                selectedImageBase64 = log.image;
+                document.getElementById('image-preview').src = log.image;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            } else {
+                removeSelectedImage();
+            }
             
             // Switch Form UI to Edit Mode
             document.getElementById('form-title').innerHTML = `<span class="mr-2">✏️</span> 編輯訓練紀錄`;
@@ -811,6 +904,7 @@
         function cancelEditLog() {
             editingIndex = -1;
             document.getElementById('log-notes').value = '';
+            removeSelectedImage();
             
             // Revert Form UI to Add Mode
             document.getElementById('form-title').innerHTML = `<span class="mr-2">📝</span> 紀錄今日跑步 / 肌力訓練`;
@@ -860,6 +954,9 @@
             updateSchedule('base');
             initCharts();
             renderLogs();
+
+            // Register File Upload Change Listener
+            document.getElementById('log-image').addEventListener('change', handleImageSelection);
         };
 
         function initCharts() {
